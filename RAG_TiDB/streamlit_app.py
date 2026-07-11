@@ -29,7 +29,7 @@ def get_db():
         user=st.secrets["TIDB_USER"],
         password=st.secrets["TIDB_PASSWORD"],
         database=st.secrets.get("TIDB_DATABASE", "RAG"),
-        ssl_ca="/etc/ssl/cert.pem",
+        ssl_ca="/etc/ssl/certs/ca-certificates.crt",
         ssl_verify_cert=True,
         ssl_verify_identity=True
     )
