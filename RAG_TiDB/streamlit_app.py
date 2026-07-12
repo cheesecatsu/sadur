@@ -73,6 +73,20 @@ def search_document(query, k_top=3, max_distance=0.6):
 
     return [{"text": text, "source": source, "distance": distance} for text, source, distance in results]
 
+
+SAPAAN_PATTERN = re.compile(
+    r"^\s*(hai+|halo+|hello+|hi+|hey+|pagi|siang|sore|malam|"
+    r"assalamualaikum|makasih|terima\s*kasih|thanks|thank\s*you)"
+    r"[\s!.,]*$",
+    re.IGNORECASE
+)
+
+def is_sapaan(text):
+    """Deteksi sapaan/basa-basi singkat biar gak masuk jalur RAG sama sekali,
+    jadi search_document gak dipanggil dan expander sumber gak nongol."""
+    return bool(SAPAAN_PATTERN.match(text.strip()))
+
+
 def extract_answer_only(text):
     """Buang prefix 'Pertanyaan: ...' dari chunk, sisain isi Jawaban-nya aja,
     biar LLM gak ketuker antara pertanyaan di dalam context vs pertanyaan user."""
@@ -101,6 +115,31 @@ def handle_groq_error(e):
 
 # ===== FUNGSI JAWAB DENGAN STREAMING (GROQ) =====
 def jawab_stream(query, result_holder):
+    result_holder["docs"] = []
+
+    # Sapaan/basa-basi: jangan sentuh RAG sama sekali, biar docs pasti kosong
+    # dan expander sumber gak muncul buat query kayak "hai"/"halo".
+    if is_sapaan(query):
+        try:
+            stream = llm_agent.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia. Balas sapaan user dengan ramah dan singkat, tanpa menilai benar/salah kalimat."
+                    },
+                    {"role": "user", "content": query}
+                ],
+                stream=True
+            )
+            for chunk in stream:
+                content = chunk.choices[0].delta.content
+                if content:
+                    yield content
+        except (RateLimitError, APIStatusError, APIConnectionError, APITimeoutError, AuthenticationError) as e:
+            yield from handle_groq_error(e)
+        return
+
     try:
         docs = search_document(query, k_top=3, max_distance=0.6)
     except mysql.connector.Error as e:
@@ -136,7 +175,7 @@ def jawab_stream(query, result_holder):
     # biar LLM gak ketuker antara pertanyaan di dalam context vs pertanyaan user
     context = "\n\n".join(extract_answer_only(d["text"]) for d in docs)
 
-    prompt = f"""Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa pertanyaan user. Jawab PERMINTAAN USER pakai ATURAN EYD di bawah kalau relevan (boleh sebagian). Kalau kalimat user sudah benar, bilang begitu. Kalau kalimat perlu diperbaiki, tulis versi perbaikannya + alasan singkat (1-2 kalimat). Kalau tidak ada aturan yang relevan sama sekali atau USER bertanya di luar lingkup, bilang: "Maaf, informasi ini di luar cakupan materi yang saya miliki." Jangan tampilkan proses berpikir, langsung jawaban akhir saja. Kalau PERMINTAAN USER cuma sapaan atau basa-basi (bukan kalimat yang perlu dicek/pertanyaan seputar EYD atau esai), balas dengan sapaan ramah biasa, jangan menilai benar/salah dan jangan sertakan sumber di expander karena USER hanya menyapa.
+    prompt = f"""Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa pertanyaan user. Jawab PERMINTAAN USER pakai ATURAN EYD di bawah kalau relevan (boleh sebagian). Kalau kalimat user sudah benar, bilang begitu. Kalau kalimat perlu diperbaiki, tulis versi perbaikannya + alasan singkat (1-2 kalimat). Kalau tidak ada aturan yang relevan sama sekali atau USER bertanya di luar lingkup, bilang: "Maaf, informasi ini di luar cakupan materi yang saya miliki." Jangan tampilkan proses berpikir, langsung jawaban akhir saja.
 
 ATURAN EYD:
 {context}
@@ -260,13 +299,6 @@ if prompt := st.chat_input("Ketik pertanyaanmu..."):
     with st.chat_message("user", avatar=USER_AVATAR):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
-
-    # Ambil dokumen sumber duluan biar bisa ditampilkan setelah jawaban selesai
-    try:
-        sumber_docs = search_document(prompt, k_top=3)
-    except mysql.connector.Error as e:
-        print(f"[DB ERROR] {e}")
-        sumber_docs = []
 
     # Respon bot (dengan streaming)
     with st.chat_message("assistant", avatar=BOT_AVATAR):
