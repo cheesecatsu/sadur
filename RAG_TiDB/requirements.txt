@@ -1,4 +1,5 @@
 streamlit
 mysql-connector-python
+certifi
 groq
 sentence-transformers
