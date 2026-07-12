@@ -29,7 +29,7 @@ def get_db():
         user=st.secrets["TIDB_USER"],
         password=st.secrets["TIDB_PASSWORD"],
         database=st.secrets.get("TIDB_DATABASE", "RAG"),
-        ssl_ca="/etc/ssl/certs/ca-certificates.crt",
+        ssl_ca="/etc/ssl/cert.pem",
         ssl_verify_cert=True,
         ssl_verify_identity=True
     )
@@ -59,7 +59,7 @@ def search_document(query, k_top=3, max_distance=0.6):
     query_embedding_str = json.dumps(query_embedding)
 
     sql_query = f"""
-        SELECT text, source, vec_cosine_distance(embedding, %s) AS distance
+        SELECT text, vec_cosine_distance(embedding, %s) AS distance
         FROM DOCS
         HAVING distance <= %s
         ORDER BY distance ASC
@@ -70,7 +70,7 @@ def search_document(query, k_top=3, max_distance=0.6):
     results = curr.fetchall()
     curr.close()
 
-    return [{"text": text, "source": source, "distance": distance} for text, source, distance in results]
+    return [{"text": text, "distance": distance} for text, distance in results]
 
 def extract_answer_only(text):
     """Buang prefix 'Pertanyaan: ...' dari chunk, sisain isi Jawaban-nya aja,
@@ -78,10 +78,6 @@ def extract_answer_only(text):
     match = re.search(r"Jawaban:\s*(.*)", text, re.DOTALL)
     return match.group(1).strip() if match else text
 
-def extract_question(text):
-    """Ekstrak pertanyaan dari chunk untuk ditampilkan sebagai sumber."""
-    match = re.search(r"Pertanyaan:\s*(.*?)(?:\nJawaban:|$)", text, re.DOTALL)
-    return match.group(1).strip() if match else ""
 
 def handle_groq_error(e):
     """Terjemahin error dari Groq API jadi pesan yang enak dibaca user,
@@ -188,28 +184,10 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if message.get("sumber"):
-            with st.expander("📄 Sumber Referensi"):
-                for idx, s in enumerate(message["sumber"], 1):
-                    st.markdown(f"**Sumber {idx}:**")
-                    # Tampilkan pertanyaan asli dari dokumen
-                    question = extract_question(s["text"])
-                    if question:
-                        st.markdown(f"📌 **Pertanyaan:** {question}")
-                    
-                    # Tampilkan sumber
-                    if s.get("source"):
-                        st.markdown(f"📚 **Sumber:** {s['source']}")
-                    else:
-                        st.markdown("📚 **Sumber:** Tidak tersedia")
-                    
-                    # Tampilkan cuplikan jawaban singkat (opsional)
-                    answer_preview = extract_answer_only(s["text"])
-                    if answer_preview:
-                        # Potong jika terlalu panjang
-                        if len(answer_preview) > 200:
-                            answer_preview = answer_preview[:200] + "..."
-                        st.markdown(f"💡 **Ringkasan:** {answer_preview}")
-                    
+            with st.expander("📄 Sumber yang dipakai"):
+                for s in message["sumber"]:
+                    st.caption(f"Skor jarak: {s['distance']:.4f}")
+                    st.write(s["text"])
                     st.divider()
 
 # Input
@@ -234,28 +212,10 @@ if prompt := st.chat_input("Ketik pertanyaanmu..."):
                 response_text = st.write_stream(response_stream)
 
                 if sumber_docs:
-                    with st.expander("📄 Sumber Referensi"):
-                        for idx, s in enumerate(sumber_docs, 1):
-                            st.markdown(f"**Sumber {idx}:**")
-                            # Tampilkan pertanyaan asli dari dokumen
-                            question = extract_question(s["text"])
-                            if question:
-                                st.markdown(f"📌 **Pertanyaan:** {question}")
-                            
-                            # Tampilkan sumber
-                            if s.get("source"):
-                                st.markdown(f"📚 **Sumber:** {s['source']}")
-                            else:
-                                st.markdown("📚 **Sumber:** Tidak tersedia")
-                            
-                            # Tampilkan cuplikan jawaban singkat (opsional)
-                            answer_preview = extract_answer_only(s["text"])
-                            if answer_preview:
-                                # Potong jika terlalu panjang
-                                if len(answer_preview) > 200:
-                                    answer_preview = answer_preview[:200] + "..."
-                                st.markdown(f"💡 **Ringkasan:** {answer_preview}")
-                            
+                    with st.expander("📄 Sumber yang dipakai"):
+                        for s in sumber_docs:
+                            st.caption(f"Skor jarak: {s['distance']:.4f}")
+                            st.write(s["text"])
                             st.divider()
 
                 st.session_state.messages.append({
