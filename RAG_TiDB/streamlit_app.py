@@ -1,6 +1,7 @@
 import streamlit as st
 import mysql.connector
 import json
+import certifi
 import re
 from groq import Groq, RateLimitError, APIConnectionError, APIStatusError, AuthenticationError, APITimeoutError
 from sentence_transformers import SentenceTransformer
@@ -29,7 +30,7 @@ def get_db():
         user=st.secrets["TIDB_USER"],
         password=st.secrets["TIDB_PASSWORD"],
         database=st.secrets.get("TIDB_DATABASE", "RAG"),
-        ssl_ca="/etc/ssl/cert.pem",
+        ssl_ca=certifi.where(),
         ssl_verify_cert=True,
         ssl_verify_identity=True
     )
