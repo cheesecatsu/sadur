@@ -135,7 +135,7 @@ def jawab_stream(query):
     # biar LLM gak ketuker antara pertanyaan di dalam context vs pertanyaan user
     context = "\n\n".join(extract_answer_only(d["text"]) for d in docs)
  
-    prompt = f"""Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa pertanyaan user. JANGAN GUNAKAN BAHASA INGGRIS. Jawab PERMINTAAN USER pakai ATURAN EYD di bawah kalau relevan (boleh sebagian). Kalau kalimat user sudah benar, bilang begitu. Kalau kalimat perlu diperbaiki, tulis versi perbaikannya + alasan singkat (1-2 kalimat). Kalau tidak ada aturan yang relevan sama sekali atau USER bertanya di luar lingkup, bilang: "Maaf, informasi ini di luar cakupan materi yang saya miliki." Jangan tampilkan proses berpikir, langsung jawaban akhir saja.
+    prompt = f"""Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa pertanyaan user. Jawab PERMINTAAN USER pakai ATURAN EYD di bawah kalau relevan (boleh sebagian). Kalau kalimat user sudah benar, bilang begitu. Kalau kalimat perlu diperbaiki, tulis versi perbaikannya + alasan singkat (1-2 kalimat). Kalau tidak ada aturan yang relevan sama sekali atau USER bertanya di luar lingkup, bilang: "Maaf, informasi ini di luar cakupan materi yang saya miliki." Jangan tampilkan proses berpikir, langsung jawaban akhir saja.
  
 ATURAN EYD:
 {context}
@@ -174,6 +174,48 @@ st.set_page_config(
     layout="centered"
 )
  
+BOT_AVATAR = "🤖"
+USER_AVATAR = "🧑"
+ 
+# ===== CUSTOM CSS =====
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
+ 
+h1 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+}
+ 
+/* Bubble chat lebih membulat & ada sedikit shadow */
+.stChatMessage {
+    border-radius: 16px;
+    padding: 4px 6px;
+}
+ 
+/* Bubble user dikasih warna beda biar kontras sama bot */
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+    background-color: #FFF4EE;
+}
+ 
+/* Card sumber */
+.sumber-card {
+    background-color: #FFF4EE;
+    border-left: 4px solid #E8622C;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+ 
+/* Tombol sidebar */
+.stButton > button {
+    border-radius: 10px;
+    border: 1px solid #E8622C;
+}
+</style>
+""", unsafe_allow_html=True)
+ 
 st.title("🤖 Sadur AI")
 st.caption("Tanyakan apa saja tentang teks eksposisi, esai, atau topik lainnya!")
  
@@ -189,7 +231,7 @@ with st.sidebar:
  
  
 def render_sumber(sumber_docs):
-    """Tampilkan daftar sumber unik yang dipakai, tanpa skor jarak."""
+    """Tampilkan daftar sumber unik yang dipakai sebagai card, tanpa skor jarak."""
     with st.expander("📄 Sumber yang dipakai"):
         seen = set()
         for s in sumber_docs:
@@ -197,12 +239,16 @@ def render_sumber(sumber_docs):
             if source_name in seen:
                 continue
             seen.add(source_name)
-            st.markdown(f"- {source_name}")
+            st.markdown(
+                f'<div class="sumber-card">📚 {source_name}</div>',
+                unsafe_allow_html=True
+            )
  
  
 # Tampilkan chat
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
+    avatar = BOT_AVATAR if message["role"] == "assistant" else USER_AVATAR
+    with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
         if message.get("sumber"):
             render_sumber(message["sumber"])
@@ -210,7 +256,7 @@ for message in st.session_state.messages:
 # Input
 if prompt := st.chat_input("Ketik pertanyaanmu..."):
     # Pesan user
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=USER_AVATAR):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
  
@@ -222,7 +268,7 @@ if prompt := st.chat_input("Ketik pertanyaanmu..."):
         sumber_docs = []
  
     # Respon bot (dengan streaming)
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=BOT_AVATAR):
         with st.spinner("🔍 Mencari jawaban..."):
             try:
                 response_stream = jawab_stream(prompt)
