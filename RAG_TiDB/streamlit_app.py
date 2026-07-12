@@ -289,7 +289,7 @@ st.caption("Sadur AI adalah chatbot pembelajaran Bahasa Indonesia yang membantu 
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Halo! 👋 Ingin mulai menyadur?"}
+        {"role": "assistant", "content": "Halo! 👋 Ingin mulai menulis atau menyadur?"}
     ]
 
 with st.sidebar:
