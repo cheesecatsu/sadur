@@ -177,7 +177,14 @@ def jawab_stream(query, result_holder, history=None):
                 messages=[
                     {
                         "role": "system",
-                        "content": "Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa yang dipakai user (termasuk sapaan singkat seperti 'hi'/'hello'). Jangan pernah membalas dalam Bahasa Inggris."
+                        "content": (
+                            "Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa yang dipakai user "
+                            "(termasuk sapaan singkat seperti 'hi'/'hello'). Jangan pernah membalas dalam Bahasa Inggris. "
+                            "Kamu HANYA membahas seputar Bahasa Indonesia, penulisan esai/teks eksposisi, PUEBI, dan topik "
+                            "pembelajaran bahasa terkait. Kalau permintaan user di luar topik itu (misalnya matematika, "
+                            "coding, sains, atau hal umum lain yang tidak berkaitan dengan bahasa/esai), JANGAN dijawab isinya. "
+                            "Balas persis: \"Maaf, informasi ini di luar cakupan materi yang saya miliki.\""
+                        )
                     },
                     *history,
                     {"role": "user", "content": query}
