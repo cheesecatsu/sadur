@@ -75,9 +75,15 @@ def search_document(query, k_top=3, max_distance=0.6):
 
 
 SAPAAN_PATTERN = re.compile(
-    r"^\s*(hai+|halo+|hello+|hi+|hey+|selamat+|pagi|siang|sore|malam|"
-    r"assalamualaikum|selamat|makasih|terima\s*kasih|thanks|thank\s*you)"
-    r"[\s!.,]*$",
+    r"^\s*("
+    r"hai+|halo+|hello+|hi+|hey+|"
+    r"(selamat\s+)?(pagi|siang|sore|malam)|"
+    r"assalamu[' ]?alaikum|waalaikumsalam|"
+    r"(makasih|terima\s*kasih|thanks|thank\s*you)(\s+(banyak|ya|kak|min))?|"
+    r"(apa\s*kabar|gimana\s*kabar|how\s+are\s+you)|"
+    r"(sampai\s*jumpa|dadah|bye+|see\s*you)"
+    r")"
+    r"[\s!.,?]*$",
     re.IGNORECASE
 )
 
