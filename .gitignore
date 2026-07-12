@@ -1,5 +1,21 @@
+# Rahasia dan konfigurasi lokal
+.streamlit/secrets.toml
+.env
 .env/
+.venv/
+venv/
+
+# Python
 __pycache__/
 *.pyc
-chat_history.db
+*.pyo
+
+# macOS dan editor
 .DS_Store
+.vscode/
+
+# File migrasi sementara
+unmatched_database_rows.csv
+
+# Backup lokal
+streamlit_app_backup.py
