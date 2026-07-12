@@ -135,7 +135,7 @@ def jawab_stream(query):
     # biar LLM gak ketuker antara pertanyaan di dalam context vs pertanyaan user
     context = "\n\n".join(extract_answer_only(d["text"]) for d in docs)
  
-    prompt = f"""Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa pertanyaan user. Jawab PERMINTAAN USER pakai ATURAN EYD di bawah kalau relevan (boleh sebagian). Kalau kalimat user sudah benar, bilang begitu. Kalau kalimat perlu diperbaiki, tulis versi perbaikannya + alasan singkat (1-2 kalimat). Kalau tidak ada aturan yang relevan sama sekali atau USER bertanya di luar lingkup, bilang: "Maaf, informasi ini di luar cakupan materi yang saya miliki." Jangan tampilkan proses berpikir, langsung jawaban akhir saja.
+    prompt = f"""Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa pertanyaan user. Jangan gunakan Bahasa Inggris. Jawab PERMINTAAN USER pakai ATURAN EYD di bawah kalau relevan (boleh sebagian). Kalau kalimat user sudah benar, bilang begitu. Kalau kalimat perlu diperbaiki, tulis versi perbaikannya + alasan singkat (1-2 kalimat). Kalau tidak ada aturan yang relevan sama sekali atau USER bertanya di luar lingkup, bilang: "Maaf, informasi ini di luar cakupan materi yang saya miliki." Jangan tampilkan proses berpikir, langsung jawaban akhir saja.
  
 ATURAN EYD:
 {context}
