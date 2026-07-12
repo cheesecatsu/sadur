@@ -100,13 +100,15 @@ def handle_groq_error(e):
 
 
 # ===== FUNGSI JAWAB DENGAN STREAMING (GROQ) =====
-def jawab_stream(query):
+def jawab_stream(query, result_holder):
     try:
         docs = search_document(query, k_top=3, max_distance=0.6)
     except mysql.connector.Error as e:
         print(f"[DB ERROR] {e}")
         yield "⚠️ Gagal terhubung ke database pengetahuan. Coba lagi sebentar lagi."
         return
+
+    result_holder["docs"] = docs
 
     # Kalo ga ada dokumen relevan
     if not docs:
@@ -270,9 +272,11 @@ if prompt := st.chat_input("Ketik pertanyaanmu..."):
     with st.chat_message("assistant", avatar=BOT_AVATAR):
         with st.spinner("🔍 Mencari jawaban..."):
             try:
-                response_stream = jawab_stream(prompt)
+                result_holder = {}
+                response_stream = jawab_stream(prompt, result_holder)
                 response_text = st.write_stream(response_stream)
 
+                sumber_docs = result_holder.get("docs", [])
                 if sumber_docs:
                     render_sumber(sumber_docs)
 
