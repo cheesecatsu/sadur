@@ -173,8 +173,8 @@ st.set_page_config(
     layout="centered"
 )
 
-BOT_AVATAR = "https://raw.githubusercontent.com/cheesecatsu/sadur/RAG_TiDB/assets/bot-avatar.svg"
-USER_AVATAR = "https://raw.githubusercontent.com/USERNAME/sadur/RAG_TiDB/assets/user-avatar.svg" 
+BOT_AVATAR = "https://raw.githubusercontent.com/cheesecatsu/sadur/refs/heads/main/RAG_TiDB/assets/bot-avatar.svg"
+USER_AVATAR = "https://raw.githubusercontent.com/cheesecatsu/sadur/refs/heads/main/RAG_TiDB/assets/user-avatar.svg" 
 
 # ===== CUSTOM CSS =====
 st.markdown("""
