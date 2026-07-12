@@ -285,7 +285,7 @@ h1 {
 """, unsafe_allow_html=True)
 
 st.title("🤖 Sadur AI")
-st.caption("Sadur AI adalah chatbot pembelajaran Bahasa Indonesia yang membantu memahami materi menulis, tata bahasa, teks eksposisi, esai, dan pemahaman bacaan. Ketik pertanyaan atau kalimat yang ingin diperiksa secara jelas pada kolom chat, Sadur AI akan memberikan penjelasan, saran perbaikan, serta sumber referensi.")
+st.caption("Sadur AI adalah chatbot pembelajaran Bahasa Indonesia yang membantu memahami materi menulis, tata bahasa, teks eksposisi, esai, dan pemahaman bacaan. Ketik pertanyaan atau kalimat yang ingin diperiksa secara jelas pada kolom chat. Sadur AI akan memberikan penjelasan, saran perbaikan, serta sumber referensi.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
