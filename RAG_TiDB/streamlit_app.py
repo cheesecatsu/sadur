@@ -93,6 +93,19 @@ def is_sapaan(text):
     return bool(SAPAAN_PATTERN.match(text.strip()))
 
 
+def build_history_messages(chat_messages, max_turns=3, max_chars_per_msg=300):
+    """Ambil beberapa pesan terakhir (bukan semua histori) dan potong tiap pesan
+    yang kepanjangan, biar konteks follow-up jalan tanpa boros token.
+    max_turns=3 berarti maksimal 3 pertukaran (user+assistant) terakhir = 6 pesan."""
+    trimmed = []
+    for msg in chat_messages[-(max_turns * 2):]:
+        content = msg["content"]
+        if len(content) > max_chars_per_msg:
+            content = content[:max_chars_per_msg] + "..."
+        trimmed.append({"role": msg["role"], "content": content})
+    return trimmed
+
+
 def extract_answer_only(text):
     """Buang prefix 'Pertanyaan: ...' dari chunk, sisain isi Jawaban-nya aja,
     biar LLM gak ketuker antara pertanyaan di dalam context vs pertanyaan user."""
@@ -120,8 +133,9 @@ def handle_groq_error(e):
 
 
 # ===== FUNGSI JAWAB DENGAN STREAMING (GROQ) =====
-def jawab_stream(query, result_holder):
+def jawab_stream(query, result_holder, history=None):
     result_holder["docs"] = []
+    history = history or []
 
     # Sapaan/basa-basi: jangan sentuh RAG sama sekali, biar docs pasti kosong
     # dan expander sumber gak muncul buat query kayak "hai"/"halo".
@@ -165,6 +179,7 @@ def jawab_stream(query, result_holder):
                         "role": "system",
                         "content": "Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa yang dipakai user (termasuk sapaan singkat seperti 'hi'/'hello'). Jangan pernah membalas dalam Bahasa Inggris."
                     },
+                    *history,
                     {"role": "user", "content": query}
                 ],
                 stream=True
@@ -181,14 +196,14 @@ def jawab_stream(query, result_holder):
     # biar LLM gak ketuker antara pertanyaan di dalam context vs pertanyaan user
     context = "\n\n".join(extract_answer_only(d["text"]) for d in docs)
 
-    prompt = f"""Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa pertanyaan user. Jawab PERMINTAAN USER pakai ATURAN EYD di bawah kalau relevan (boleh sebagian). Kalau kalimat user sudah benar, bilang begitu. Kalau kalimat perlu diperbaiki, tulis versi perbaikannya + alasan singkat (1-2 kalimat). Kalau tidak ada aturan yang relevan sama sekali atau USER bertanya di luar lingkup, bilang: "Maaf, informasi ini di luar cakupan materi yang saya miliki." Jangan tampilkan proses berpikir, langsung jawaban akhir saja.
+    prompt = f"""Kamu asisten yang SELALU menjawab dalam Bahasa Indonesia, apa pun bahasa pertanyaan user maupun bahasa ATURAN di bawah. Jawab PERMINTAAN USER pakai ATURAN di bawah kalau relevan (boleh sebagian). PENTING: sebagian ATURAN di bawah mungkin ditulis dalam Bahasa Inggris (diambil dari sumber internasional) — terjemahkan dan parafrasekan dulu maknanya ke Bahasa Indonesia dengan bahasamu sendiri sebelum menjawab. JANGAN mengutip, menyalin, atau membiarkan potongan kalimat Bahasa Inggris apa pun muncul di jawaban akhir. Kalau kalimat user sudah benar, bilang begitu. Kalau kalimat perlu diperbaiki, tulis versi perbaikannya + alasan singkat (1-2 kalimat). Kalau tidak ada aturan yang relevan sama sekali atau USER bertanya di luar lingkup, bilang: "Maaf, informasi ini di luar cakupan materi yang saya miliki." Jangan tampilkan proses berpikir, langsung jawaban akhir saja.
 
-ATURAN EYD:
+ATURAN:
 {context}
 
 PERMINTAAN USER: {query}
 
-JAWABAN:"""
+JAWABAN (WAJIB Bahasa Indonesia, tanpa kutipan Bahasa Inggris):"""
 
     print("=" * 50)
     print("PROMPT YANG DIKIRIM:")
@@ -198,7 +213,7 @@ JAWABAN:"""
     try:
         stream = llm_agent.chat.completions.create(
         model=GROQ_MODEL,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[*history, {"role": "user", "content": prompt}],
         stream=True,
         max_tokens=400  # cukup buat jawaban + penjelasan singkat, biasanya gak butuh lebih
         )
@@ -310,8 +325,12 @@ if prompt := st.chat_input("Ketik pertanyaanmu..."):
     with st.chat_message("assistant", avatar=BOT_AVATAR):
         with st.spinner("🔍 Mencari jawaban..."):
             try:
+                # Histori diambil SEBELUM pesan user saat ini ditambahkan lagi di sini,
+                # jadi ini murni pesan-pesan sebelumnya (bukan termasuk 'prompt' sekarang).
+                history = build_history_messages(st.session_state.messages[:-1])
+
                 result_holder = {}
-                response_stream = jawab_stream(prompt, result_holder)
+                response_stream = jawab_stream(prompt, result_holder, history)
                 response_text = st.write_stream(response_stream)
 
                 sumber_docs = result_holder.get("docs", [])
