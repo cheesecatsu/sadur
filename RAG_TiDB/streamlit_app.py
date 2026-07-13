@@ -50,7 +50,7 @@ def get_live_db():
     try:
         db.ping(reconnect=True, attempts=3, delay=1)
     except mysql.connector.Error:
-        # Kalau ping tetap gagal, hapus cache biar dibuat koneksi baru dari nol
+        # Ping gagal, hapus cache.
         get_db.clear()
         db = get_db()
     return db
@@ -409,7 +409,7 @@ h1 {
 """, unsafe_allow_html=True)
 
 st.title("🤖 Sadur AI")
-st.caption("Tanyakan apa saja tentang teks eksposisi, esai, atau topik lainnya!")
+st.caption("Sadur AI adalah chatbot pembelajaran Bahasa Indonesia yang membantu memahami materi menulis, tata bahasa, teks eksposisi, esai, dan pemahaman bacaan. Ketik pertanyaan atau kalimat yang ingin diperiksa secara jelas pada kolom chat. Sadur AI akan memberikan penjelasan, saran perbaikan, serta sumber referensi.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
