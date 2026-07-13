@@ -3,11 +3,13 @@ import mysql.connector
 import json
 import re
 import certifi
-from groq import Groq, RateLimitError, APIConnectionError, APIStatusError, AuthenticationError, APITimeoutError
+import groq
+from groq import Groq
 from sentence_transformers import SentenceTransformer
 
 # ===== KONFIGURASI =====
 GROQ_MODEL = "llama-3.3-70b-versatile"
+OUT_OF_SCOPE_MESSAGE = "Maaf, informasi ini di luar cakupan materi yang saya miliki."
 
 # ===== LOAD MODEL =====
 @st.cache_resource
@@ -113,21 +115,31 @@ def extract_answer_only(text):
     return match.group(1).strip() if match else text
 
 
+def is_out_of_scope_response(text):
+    """Cek apakah jawaban akhir menyatakan pertanyaan berada di luar cakupan."""
+    normalized_text = re.sub(r"\s+", " ", str(text or "")).strip().lower()
+    normalized_target = OUT_OF_SCOPE_MESSAGE.rstrip(".").lower()
+    return normalized_target in normalized_text.rstrip(".")
+
+
 def handle_groq_error(e):
-    """Terjemahin error dari Groq API jadi pesan yang enak dibaca user,
-    sambil tetep nge-print detail aslinya ke terminal/log buat debug."""
+    """Terjemahkan error Groq menjadi pesan yang mudah dipahami pengguna."""
     print(f"[GROQ ERROR] {type(e).__name__}: {e}")
 
-    if isinstance(e, RateLimitError):
+    error_name = type(e).__name__
+    status_code = getattr(e, "status_code", None)
+
+    if error_name == "RateLimitError":
         yield "⏳ Lagi banyak yang nanya nih, server AI-nya kepenuhan permintaan. Coba tunggu 30-60 detik lalu tanya lagi ya."
-    elif isinstance(e, AuthenticationError):
+    elif error_name == "AuthenticationError":
         yield "🔑 Ada masalah konfigurasi API key. Tolong beri tahu pengelola aplikasi (bukan salah kamu)."
-    elif isinstance(e, APITimeoutError):
+    elif error_name == "APITimeoutError":
         yield "⌛ Server AI lambat merespons. Coba kirim ulang pertanyaannya."
-    elif isinstance(e, APIConnectionError):
+    elif error_name == "APIConnectionError":
         yield "📡 Gagal terhubung ke server AI. Cek koneksi internet, atau coba lagi sebentar lagi."
-    elif isinstance(e, APIStatusError):
-        yield f"⚠️ Server AI sedang bermasalah (kode {e.status_code}). Coba lagi beberapa saat lagi."
+    elif error_name == "APIStatusError":
+        kode = f" (kode {status_code})" if status_code is not None else ""
+        yield f"⚠️ Server AI sedang bermasalah{kode}. Coba lagi beberapa saat lagi."
     else:
         yield "❌ Terjadi kesalahan tak terduga. Coba lagi, atau hubungi pengelola aplikasi kalau berulang."
 
@@ -156,7 +168,7 @@ def jawab_stream(query, result_holder, history=None):
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
-        except (RateLimitError, APIStatusError, APIConnectionError, APITimeoutError, AuthenticationError) as e:
+        except Exception as e:
             yield from handle_groq_error(e)
         return
 
@@ -167,7 +179,7 @@ def jawab_stream(query, result_holder, history=None):
         yield "⚠️ Gagal terhubung ke database pengetahuan. Coba lagi sebentar lagi."
         return
 
-    result_holder["docs"] = docs
+    # Dokumen belum ditampilkan sampai jawaban akhir dipastikan relevan.
 
     # Kalo ga ada dokumen relevan
     if not docs:
@@ -195,7 +207,7 @@ def jawab_stream(query, result_holder, history=None):
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
-        except (RateLimitError, APIStatusError, APIConnectionError, APITimeoutError, AuthenticationError) as e:
+        except Exception as e:
             yield from handle_groq_error(e)
         return
 
@@ -224,11 +236,23 @@ JAWABAN (WAJIB Bahasa Indonesia, tanpa kutipan Bahasa Inggris):"""
         stream=True,
         max_tokens=400  # cukup buat jawaban + penjelasan singkat, biasanya gak butuh lebih
         )
+        generated_parts = []
+
         for chunk in stream:
             content = chunk.choices[0].delta.content
             if content:
+                generated_parts.append(content)
                 yield content
-    except (RateLimitError, APIStatusError, APIConnectionError, APITimeoutError, AuthenticationError) as e:
+
+        complete_response = "".join(generated_parts)
+
+        # Sumber hanya ditampilkan jika jawaban tidak menyatakan
+        # bahwa pertanyaan berada di luar cakupan.
+        if not is_out_of_scope_response(complete_response):
+            result_holder["docs"] = docs
+
+    except Exception as e:
+        result_holder["docs"] = []
         yield from handle_groq_error(e)
 
 
@@ -285,11 +309,11 @@ h1 {
 """, unsafe_allow_html=True)
 
 st.title("🤖 Sadur AI")
-st.caption("Sadur AI adalah chatbot pembelajaran Bahasa Indonesia yang membantu memahami materi menulis, tata bahasa, teks eksposisi, esai, dan pemahaman bacaan. Ketik pertanyaan atau kalimat yang ingin diperiksa secara jelas pada kolom chat. Sadur AI akan memberikan penjelasan, saran perbaikan, serta sumber referensi.")
+st.caption("Tanyakan apa saja tentang teks eksposisi, esai, atau topik lainnya!")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Halo! 👋 Ingin mulai menulis atau menyadur?"}
+        {"role": "assistant", "content": "Halo! 👋 Ada yang bisa saya bantu?"}
     ]
 
 with st.sidebar:
@@ -318,7 +342,10 @@ for message in st.session_state.messages:
     avatar = BOT_AVATAR if message["role"] == "assistant" else USER_AVATAR
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
-        if message.get("sumber"):
+        if (
+            message.get("sumber")
+            and not is_out_of_scope_response(message["content"])
+        ):
             render_sumber(message["sumber"])
 
 # Input
@@ -341,6 +368,10 @@ if prompt := st.chat_input("Ketik pertanyaanmu..."):
                 response_text = st.write_stream(response_stream)
 
                 sumber_docs = result_holder.get("docs", [])
+
+                if is_out_of_scope_response(response_text):
+                    sumber_docs = []
+
                 if sumber_docs:
                     render_sumber(sumber_docs)
 
